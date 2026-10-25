@@ -4,6 +4,8 @@
 
 **公會：活動與空間公會** · [自由工坊](https://freetwai.com) · [線上技能書](https://freetwai.com/development/skills/event-space)
 
+[空間排程與預約規範](SCHEDULING.md) 記載了排程工作流、場地預約規則以及結構化資料定義。
+
 ## 開始使用
 
 1. 讀 [SKILL.md](SKILL.md)，選擇 `templates/` 的表格。
