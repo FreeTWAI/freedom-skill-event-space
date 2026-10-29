@@ -82,3 +82,22 @@ class E2EValidation(unittest.TestCase):
         errors = module.validate(plan)
         self.assertIn("roles must be a list of nonempty names", errors)
         self.assertIn("each agenda item needs a listed owner role", errors)
+
+    def test_space_capacity_exact_match(self):
+        plan = self.get_valid_plan()
+        plan["expected_attendees"] = 20
+        plan["venue_capacity"] = 20
+        errors = module.validate(plan)
+        self.assertEqual(errors, [])
+
+    def test_equipment_checklist_parsing(self):
+        plan = self.get_valid_plan()
+        plan["equipment_checklist"] = ["Projector", "Microphone", "Whiteboard"]
+        errors = module.validate(plan)
+        self.assertEqual(errors, [])
+
+    def test_event_flow_diagrams(self):
+        plan = self.get_valid_plan()
+        plan["flow_diagrams"] = ["entrance.png", "stage_layout.png"]
+        errors = module.validate(plan)
+        self.assertEqual(errors, [])
