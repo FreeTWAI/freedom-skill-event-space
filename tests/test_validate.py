@@ -42,3 +42,73 @@ class PlanValidation(unittest.TestCase):
 
     def test_non_object_is_rejected(self):
         self.assertTrue(module.validate([]))
+
+    def test_missing_or_invalid_title(self):
+        bad = self.sample()
+        del bad['title']
+        errors = module.validate(bad)
+        self.assertIn("title is required", errors)
+
+        bad['title'] = ""
+        errors = module.validate(bad)
+        self.assertIn("title is required", errors)
+
+        bad['title'] = "   "
+        errors = module.validate(bad)
+        self.assertIn("title is required", errors)
+
+        bad['title'] = 123
+        errors = module.validate(bad)
+        self.assertIn("title is required", errors)
+
+    def test_invalid_kind(self):
+        bad = self.sample()
+        bad['kind'] = 'wrong-kind'
+        errors = module.validate(bad)
+        self.assertIn("kind must be event-space", errors)
+
+    def test_records_function_errors(self):
+        bad = self.sample()
+        bad['agenda'] = "not a list"
+        errors = module.validate(bad)
+        self.assertIn("agenda must contain at least one object", errors)
+
+        bad['agenda'] = []
+        errors = module.validate(bad)
+        self.assertIn("agenda must contain at least one object", errors)
+
+        bad['agenda'] = [{"valid": "item"}, "not a dict"]
+        errors = module.validate(bad)
+        self.assertIn("agenda must contain at least one object", errors)
+
+    def test_agenda_title_is_required(self):
+        bad = self.sample()
+        del bad['agenda'][0]['title']
+        errors = module.validate(bad)
+        self.assertIn("agenda title is required", errors)
+
+        bad['agenda'][0]['title'] = "   "
+        errors = module.validate(bad)
+        self.assertIn("agenda title is required", errors)
+
+    def test_unique_ids(self):
+        errors = []
+
+        # Valid ids
+        items_valid = [{"id": "a"}, {"id": "b"}]
+        ids = module.unique_ids(items_valid, "test", errors)
+        self.assertEqual(ids, {"a", "b"})
+        self.assertEqual(errors, [])
+
+        # Invalid id types/empty
+        items_invalid = [{"id": "a"}, {"id": ""}, {"id": 123}]
+        ids = module.unique_ids(items_invalid, "test", errors)
+        self.assertEqual(ids, set())
+        self.assertIn("test ids must be nonempty strings", errors)
+
+        # Duplicate ids
+        errors = []
+        items_duplicate = [{"id": "a"}, {"id": "a"}]
+        ids = module.unique_ids(items_duplicate, "test", errors)
+        self.assertEqual(ids, {"a"})
+        self.assertIn("test ids must be unique", errors)
