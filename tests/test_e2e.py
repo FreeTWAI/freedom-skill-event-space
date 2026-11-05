@@ -101,3 +101,81 @@ class E2EValidation(unittest.TestCase):
         plan["flow_diagrams"] = ["entrance.png", "stage_layout.png"]
         errors = module.validate(plan)
         self.assertEqual(errors, [])
+
+
+import subprocess
+import tempfile
+import sys
+import os
+
+class CLIIntegration(unittest.TestCase):
+    def setUp(self):
+        self.script_path = ROOT / "scripts" / "validate.py"
+        self.valid_plan = {
+            "kind": "event-space",
+            "title": "CLI Test Plan",
+            "expected_attendees": 10,
+            "venue_capacity": 20,
+            "roles": ["Host", "Helper"],
+            "agenda": [
+                {
+                    "start_minute": 0,
+                    "duration_minutes": 30,
+                    "title": "Welcome",
+                    "owner_role": "Host"
+                }
+            ],
+            "data_classification": "synthetic"
+        }
+
+    def test_cli_missing_args(self):
+        result = subprocess.run([sys.executable, str(self.script_path)], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("usage: python3 scripts/validate.py <plan.json>", result.stderr)
+
+    def test_cli_too_many_args(self):
+        result = subprocess.run([sys.executable, str(self.script_path), "arg1", "arg2"], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("usage: python3 scripts/validate.py <plan.json>", result.stderr)
+
+    def test_cli_missing_file(self):
+        result = subprocess.run([sys.executable, str(self.script_path), "nonexistent.json"], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_cli_invalid_json(self):
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            temp_file.write("{invalid json")
+            temp_file_path = temp_file.name
+
+        try:
+            result = subprocess.run([sys.executable, str(self.script_path), temp_file_path], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+        finally:
+            os.remove(temp_file_path)
+
+    def test_cli_valid_plan(self):
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            json.dump(self.valid_plan, temp_file)
+            temp_file_path = temp_file.name
+
+        try:
+            result = subprocess.run([sys.executable, str(self.script_path), temp_file_path], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("PASS: structural checks only; no real-world activity or results verified", result.stdout)
+        finally:
+            os.remove(temp_file_path)
+
+    def test_cli_invalid_plan(self):
+        invalid_plan = self.valid_plan.copy()
+        del invalid_plan["title"]
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            json.dump(invalid_plan, temp_file)
+            temp_file_path = temp_file.name
+
+        try:
+            result = subprocess.run([sys.executable, str(self.script_path), temp_file_path], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("title is required", result.stderr)
+        finally:
+            os.remove(temp_file_path)
