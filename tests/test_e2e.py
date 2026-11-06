@@ -179,3 +179,71 @@ class CLIIntegration(unittest.TestCase):
             self.assertIn("title is required", result.stderr)
         finally:
             os.remove(temp_file_path)
+
+    def test_cli_execution_coverage(self):
+        import runpy
+        import io
+        from unittest.mock import patch
+
+        # Test error scenarios
+        with patch.object(sys, 'argv', ['scripts/validate.py']):
+            try:
+                runpy.run_path('scripts/validate.py', run_name='__main__')
+            except SystemExit as e:
+                self.assertIn("usage: python3 scripts/validate.py <plan.json>", str(e.code))
+
+        with patch.object(sys, 'argv', ['scripts/validate.py', 'nonexistent.json']):
+            try:
+                runpy.run_path('scripts/validate.py', run_name='__main__')
+            except SystemExit as e:
+                self.assertIn("No such file or directory", str(e.code))
+
+        # Test validation error scenario
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            json.dump({"kind": "event-space"}, f)
+            path = f.name
+        try:
+            with patch.object(sys, 'argv', ['scripts/validate.py', path]):
+                with patch('sys.stderr', new_callable=io.StringIO) as mock_stderr:
+                    try:
+                        runpy.run_path('scripts/validate.py', run_name='__main__')
+                    except SystemExit as e:
+                        self.assertEqual(e.code, 1)
+                        self.assertIn("title is required", mock_stderr.getvalue())
+        finally:
+            os.remove(path)
+
+        # Test success scenario
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            json.dump({
+                "kind": "event-space",
+                "title": "A",
+                "data_classification": "synthetic",
+                "expected_attendees": 1,
+                "venue_capacity": 1,
+                "roles": ["Host"],
+                "agenda": [{"start_minute": 0, "duration_minutes": 1, "title": "A", "owner_role": "Host"}]
+            }, f)
+            path = f.name
+        try:
+            with patch.object(sys, 'argv', ['scripts/validate.py', path]):
+                with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+                    runpy.run_path('scripts/validate.py', run_name='__main__')
+                    self.assertIn("PASS", mock_stdout.getvalue())
+        finally:
+            os.remove(path)
+
+    def test_json_decode_error(self):
+        import runpy
+        from unittest.mock import patch
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("{ invalid json")
+            path = f.name
+        try:
+            with patch.object(sys, 'argv', ['scripts/validate.py', path]):
+                try:
+                    runpy.run_path('scripts/validate.py', run_name='__main__')
+                except SystemExit as e:
+                    self.assertIn("Expecting property name", str(e.code))
+        finally:
+            os.remove(path)
