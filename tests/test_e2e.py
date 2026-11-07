@@ -247,3 +247,46 @@ class CLIIntegration(unittest.TestCase):
                     self.assertIn("Expecting property name", str(e.code))
         finally:
             os.remove(path)
+
+    def test_e2e_full_workflow_valid_plan(self):
+        # Generate a valid plan
+        plan = self.valid_plan.copy()
+
+        # Write to a temporary file
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            json.dump(plan, temp_file)
+            temp_file_path = temp_file.name
+
+        try:
+            # Simulate CLI validation execution
+            result = subprocess.run([sys.executable, str(self.script_path), temp_file_path], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("PASS: structural checks only", result.stdout)
+
+            # Simulate loading the validated plan into the ingestion module
+            errors = module.validate(plan)
+            self.assertEqual(errors, [])
+        finally:
+            os.remove(temp_file_path)
+
+    def test_e2e_full_workflow_invalid_plan(self):
+        # Generate an invalid plan
+        plan = self.valid_plan.copy()
+        plan["venue_capacity"] = 5 # less than attendees
+
+        # Write to a temporary file
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            json.dump(plan, temp_file)
+            temp_file_path = temp_file.name
+
+        try:
+            # Simulate CLI validation execution
+            result = subprocess.run([sys.executable, str(self.script_path), temp_file_path], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("attendance exceeds the stated venue capacity", result.stderr)
+
+            # Simulate loading the validated plan into the ingestion module
+            errors = module.validate(plan)
+            self.assertIn("attendance exceeds the stated venue capacity", errors)
+        finally:
+            os.remove(temp_file_path)
