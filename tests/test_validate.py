@@ -112,3 +112,93 @@ class PlanValidation(unittest.TestCase):
         ids = module.unique_ids(items_duplicate, "test", errors)
         self.assertEqual(ids, {"a"})
         self.assertIn("test ids must be unique", errors)
+
+    def test_capacity_and_attendance_edge_cases(self):
+        # zero
+        bad = self.sample()
+        bad['expected_attendees'] = 0
+        self.assertIn("attendance and capacity must be positive integers", module.validate(bad))
+
+        # negative
+        bad = self.sample()
+        bad['venue_capacity'] = -5
+        self.assertIn("attendance and capacity must be positive integers", module.validate(bad))
+
+        # float
+        bad = self.sample()
+        bad['expected_attendees'] = 10.5
+        self.assertIn("attendance and capacity must be positive integers", module.validate(bad))
+
+        # boolean
+        bad = self.sample()
+        bad['venue_capacity'] = True
+        self.assertIn("attendance and capacity must be positive integers", module.validate(bad))
+
+        # missing
+        bad = self.sample()
+        del bad['expected_attendees']
+        self.assertIn("attendance and capacity must be positive integers", module.validate(bad))
+
+    def test_roles_edge_cases(self):
+        # empty string
+        bad = self.sample()
+        bad['roles'] = ["Host", ""]
+        self.assertIn("roles must be a list of nonempty names", module.validate(bad))
+
+        # whitespace
+        bad = self.sample()
+        bad['roles'] = ["  "]
+        self.assertIn("roles must be a list of nonempty names", module.validate(bad))
+
+        # non-string
+        bad = self.sample()
+        bad['roles'] = ["Host", 123]
+        self.assertIn("roles must be a list of nonempty names", module.validate(bad))
+
+        # missing owner_role
+        bad = self.sample()
+        del bad['agenda'][0]['owner_role']
+        self.assertIn("each agenda item needs a listed owner role", module.validate(bad))
+
+    def test_agenda_timing_edge_cases(self):
+        # non-number start
+        bad = self.sample()
+        bad['agenda'][0]['start_minute'] = "0"
+        self.assertIn("agenda timing must be nonnegative with a positive duration", module.validate(bad))
+
+        # boolean duration
+        bad = self.sample()
+        bad['agenda'][0]['duration_minutes'] = True
+        self.assertIn("agenda timing must be nonnegative with a positive duration", module.validate(bad))
+
+        # missing start
+        bad = self.sample()
+        del bad['agenda'][0]['start_minute']
+        self.assertIn("agenda timing must be nonnegative with a positive duration", module.validate(bad))
+
+        # missing duration
+        bad = self.sample()
+        bad['agenda'][0]['start_minute'] = 0
+        del bad['agenda'][0]['duration_minutes']
+        self.assertIn("agenda timing must be nonnegative with a positive duration", module.validate(bad))
+
+        # zero duration
+        bad = self.sample()
+        bad['agenda'][0]['duration_minutes'] = 0
+        self.assertIn("agenda timing must be nonnegative with a positive duration", module.validate(bad))
+
+    def test_unique_ids_edge_cases(self):
+        errors = []
+
+        # Missing key
+        items_missing = [{"id": "a"}, {"not-id": "b"}]
+        ids = module.unique_ids(items_missing, "test", errors)
+        self.assertEqual(ids, set())
+        self.assertIn("test ids must be nonempty strings", errors)
+
+        # Whitespace id
+        errors = []
+        items_whitespace = [{"id": "a"}, {"id": "   "}]
+        ids = module.unique_ids(items_whitespace, "test", errors)
+        self.assertEqual(ids, set())
+        self.assertIn("test ids must be nonempty strings", errors)
