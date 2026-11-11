@@ -61,6 +61,14 @@ class PlanValidation(unittest.TestCase):
         errors = module.validate(bad)
         self.assertIn("title is required", errors)
 
+        bad['title'] = "a" * 201
+        errors = module.validate(bad)
+        self.assertIn("title must not exceed 200 characters", errors)
+
+        bad['title'] = "My <script>alert(1)</script> Title"
+        errors = module.validate(bad)
+        self.assertIn("title is required", errors) # Because the title doesn't pass the text() check
+
     def test_invalid_kind(self):
         bad = self.sample()
         bad['kind'] = 'wrong-kind'
@@ -90,6 +98,14 @@ class PlanValidation(unittest.TestCase):
         bad['agenda'][0]['title'] = "   "
         errors = module.validate(bad)
         self.assertIn("agenda title is required", errors)
+
+        bad['agenda'][0]['title'] = "a" * 201
+        errors = module.validate(bad)
+        self.assertIn("agenda title must not exceed 200 characters", errors)
+
+        bad['agenda'][0]['title'] = "Agenda <tag>"
+        errors = module.validate(bad)
+        self.assertIn("agenda title is required", errors) # Because the title doesn't pass the text() check
 
     def test_unique_ids(self):
         errors = []
@@ -139,6 +155,12 @@ class PlanValidation(unittest.TestCase):
         del bad['expected_attendees']
         self.assertIn("attendance and capacity must be positive integers", module.validate(bad))
 
+        # too large
+        bad = self.sample()
+        bad['expected_attendees'] = 10001
+        bad['venue_capacity'] = 10001
+        self.assertIn("attendance and capacity must not exceed 10000", module.validate(bad))
+
     def test_roles_edge_cases(self):
         # empty string
         bad = self.sample()
@@ -159,6 +181,16 @@ class PlanValidation(unittest.TestCase):
         bad = self.sample()
         del bad['agenda'][0]['owner_role']
         self.assertIn("each agenda item needs a listed owner role", module.validate(bad))
+
+        # role length exceeded
+        bad = self.sample()
+        bad['roles'] = ["a" * 201]
+        self.assertIn("role names must not exceed 200 characters", module.validate(bad))
+
+        # html injection in role
+        bad = self.sample()
+        bad['roles'] = ["Role <script>"]
+        self.assertIn("roles must be a list of nonempty names", module.validate(bad))
 
     def test_agenda_timing_edge_cases(self):
         # non-number start
@@ -186,6 +218,16 @@ class PlanValidation(unittest.TestCase):
         bad = self.sample()
         bad['agenda'][0]['duration_minutes'] = 0
         self.assertIn("agenda timing must be nonnegative with a positive duration", module.validate(bad))
+
+        # duration too long
+        bad = self.sample()
+        bad['agenda'][0]['duration_minutes'] = 10001
+        self.assertIn("agenda timing must not exceed 10000 minutes", module.validate(bad))
+
+        # start too large
+        bad = self.sample()
+        bad['agenda'][0]['start_minute'] = 10001
+        self.assertIn("agenda timing must not exceed 10000 minutes", module.validate(bad))
 
     def test_unique_ids_edge_cases(self):
         errors = []
