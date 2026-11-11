@@ -269,6 +269,25 @@ class CLIIntegration(unittest.TestCase):
         finally:
             os.remove(temp_file_path)
 
+    def test_cli_file_size_limit(self):
+        import runpy
+        import io
+        from unittest.mock import patch
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            temp_file.seek(1024 * 1024 + 1)
+            temp_file.write("a")
+            temp_file_path = temp_file.name
+
+        try:
+            with patch.object(sys, 'argv', ['scripts/validate.py', temp_file_path]):
+                try:
+                    runpy.run_path('scripts/validate.py', run_name='__main__')
+                except SystemExit as e:
+                    self.assertIn("file size exceeds 1MB limit", str(e.code))
+        finally:
+            os.remove(temp_file_path)
+
     def test_e2e_full_workflow_invalid_plan(self):
         # Generate an invalid plan
         plan = self.valid_plan.copy()
